@@ -1,0 +1,81 @@
+{
+  "name": "skyspell",
+  "productName": "SkySpell",
+  "version": "0.1.0",
+  "description": "하늘색 테마의 크로스플랫폼 한국어 맞춤법 검사 · 글자수 세기 프로그램",
+  "main": "src/main/main.js",
+  "author": {
+    "name": "3rdappsmod",
+    "email": "3rdappsmod@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "lint": "eslint .",
+    "test": "node --test",
+    "dist": "electron-builder -wl",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "test:gui": "electron scripts/gui-smoke.cjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.11.0"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.3.9"
+  },
+  "build": {
+    "appId": "com.skyspell.app",
+    "productName": "SkySpell",
+    "files": [
+      "src/**/*",
+      "assets/icons/*.png",
+      "assets/icons/*.ico",
+      "package.json",
+      "!**/*.map"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets/icons"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "assets/icons"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "3rdappsmod",
+        "repo": "SkySpell",
+        "releaseType": "draft"
+      }
+    ]
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/3rdappsmod/SkySpell.git"
+  }
+}

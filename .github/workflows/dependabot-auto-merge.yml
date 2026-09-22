@@ -1,0 +1,29 @@
+name: Dependabot auto-merge
+
+# 메타데이터만 사용한다. PR 코드 checkout/실행을 추가하지 않는다.
+on:
+  pull_request_target:
+    branches: [main, master]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository && vars.DEPENDABOT_AUTO_MERGE == 'true'
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dependabot 메타데이터 조회
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: patch/minor 버전만 자동 병합 (major는 사람이 확인)
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
