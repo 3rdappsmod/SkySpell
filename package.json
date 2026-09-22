@@ -1,6 +1,7 @@
 {
   "name": "skyspell",
   "productName": "SkySpell",
+  "desktopName": "skyspell.desktop",
   "version": "0.1.0",
   "description": "하늘색 테마의 크로스플랫폼 한국어 맞춤법 검사 · 글자수 세기 프로그램",
   "main": "src/main/main.js",
@@ -29,7 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "electron": "^44.4.3",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^26.16.1",
     "eslint": "^10.11.0"
   },
   "dependencies": {
@@ -67,7 +68,9 @@
         "deb"
       ],
       "category": "Utility",
-      "icon": "assets/icons"
+      "icon": "assets/icons",
+      "synopsis": "한국어 맞춤법 검사 · 글자수 세기",
+      "syncDesktopName": true
     },
     "publish": [
       {
