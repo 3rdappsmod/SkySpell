@@ -26,7 +26,7 @@
     "eslint": "^10.11.0"
   },
   "dependencies": {
-    "electron-store": "^8.2.0",
+    "electron-store": "^11.0.2",
     "electron-updater": "^6.3.9"
   },
   "build": {
