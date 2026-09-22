@@ -46,3 +46,11 @@ UI 구성, Electron 메인/렌더러 분리, 코드포인트 기반 글자수 �
 - 이 PC의 시스템 Node.js 18은 새 개발 도구의 요구 버전보다 낮습니다. 검증에는 시스템을 변경하지 않고 임시 Node.js 24를 사용했습니다. 소스 개발 시 Node.js 24를 준비하세요. 패키징한 앱에는 별도 Node.js가 필요 없습니다.
 
 참고 근거: [Electron 지원 정책](https://www.electronjs.org/docs/latest/tutorial/electron-timelines), [Electron clipboard 비동기 API](https://www.electronjs.org/docs/latest/api/clipboard), [GitHub 자동 병합과 필수 검사](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/automatically-merging-a-pull-request).
+
+## 개발 환경 후속 수정 (2026-09-22)
+
+일반 터미널이 시스템 Node.js 18을 사용하여 빌드 도구에서 `ERR_REQUIRE_ESM`이 발생했습니다. 사용자 계정의 `~/.local/share/nodejs`에 공식 Node.js 24.21.0을 SHA-256 확인 후 설치하고 `~/.local/bin/node`, `npm`, `npx`를 연결했습니다. 시스템 Node.js는 유지했습니다. 기존 터미널은 `hash -r` 후 `node -v`로 전환 여부를 확인할 수 있습니다.
+
+앱 실행·검사·빌드 명령 앞에 Node.js 버전 검사를 추가했습니다. 이후 저장소에서 업데이트된 electron-store 11의 ESM default export에 맞춰 로딩 코드를 수정했고, 깨끗한 `npm ci` 이후 lint·테스트 21개·실제 GUI 검사를 통과했습니다.
+
+일반 사용자 Node.js 24 환경에서 Linux AppImage/deb 빌드를 다시 완료했습니다. Windows 교차 빌드는 ESM 오류를 해결한 뒤 NSIS 단계까지 진행했으며 Wine이 필요합니다. Windows 실기기 설치/실행 검증은 별도입니다.

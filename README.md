@@ -36,6 +36,8 @@
 
 Node.js 24 LTS를 권장합니다(`.nvmrc`, 최소 22.12). 설치된 앱을 사용할 때는 Node.js가 필요 없습니다.
 
+`ERR_REQUIRE_ESM`이 빌드 도구에서 발생하면 먼저 `node -v`를 확인하세요. Node.js 18로는 현재 빌드 도구를 실행할 수 없습니다. `.nvmrc`만으로 Node.js가 자동 전환되지는 않습니다. Node.js 24 설치 후 새 터미널을 열거나 Bash에서 `hash -r`를 실행하세요.
+
 ```bash
 npm ci
 npm start         # 앱 실행
@@ -51,6 +53,8 @@ npm run test:gui -- --live # 네이버 실서비스 교정도 확인
 npm run dist:win     # Windows 설치 파일(nsis)
 npm run dist:linux   # Linux AppImage / deb
 ```
+
+Linux에서 Windows NSIS 설치 파일을 만들려면 Wine도 필요합니다. Ubuntu에서는 `sudo apt-get install -y --no-install-recommends wine wine64`로 설치한 뒤 `npm run dist:win`을 실행하세요. Windows에서 빌드하거나 저장소의 Windows GitHub Actions 빌드를 사용하면 Wine은 필요 없습니다.
 
 ## 배포 / 자동 업데이트
 

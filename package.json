@@ -17,7 +17,14 @@
     "dist": "electron-builder -wl",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
-    "test:gui": "electron scripts/gui-smoke.cjs"
+    "test:gui": "electron scripts/gui-smoke.cjs",
+    "prestart": "node scripts/check-node.cjs",
+    "prelint": "node scripts/check-node.cjs",
+    "pretest": "node scripts/check-node.cjs",
+    "pretest:gui": "node scripts/check-node.cjs",
+    "predist": "node scripts/check-node.cjs",
+    "predist:linux": "node scripts/check-node.cjs",
+    "predist:win": "node scripts/check-node.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
