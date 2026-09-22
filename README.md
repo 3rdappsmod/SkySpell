@@ -54,7 +54,7 @@ npm run dist:win     # Windows 설치 파일(nsis)
 npm run dist:linux   # Linux AppImage / deb
 ```
 
-Linux에서 Windows NSIS 설치 파일을 만들려면 Wine도 필요합니다. Ubuntu에서는 `sudo apt-get install -y --no-install-recommends wine wine64`로 설치한 뒤 `npm run dist:win`을 실행하세요. Windows에서 빌드하거나 저장소의 Windows GitHub Actions 빌드를 사용하면 Wine은 필요 없습니다.
+Linux에서 Windows NSIS 설치 파일을 만들려면 Wine도 필요합니다. Ubuntu에서는 `sudo apt-get install -y --no-install-recommends wine wine64 wine32:i386`로 설치한 뒤 `npm run dist:win`을 실행하세요. 64비트 앱도 NSIS 설치 프로그램을 만드는 단계에서는 32비트 Wine이 필요합니다. `wine32:i386` 패키지를 찾지 못하면 먼저 `sudo dpkg --add-architecture i386`과 `sudo apt-get update`를 실행하세요. Windows에서 빌드하거나 저장소의 Windows GitHub Actions 빌드를 사용하면 Wine은 필요 없습니다.
 
 ## 배포 / 자동 업데이트
 
