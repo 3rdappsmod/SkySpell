@@ -60,3 +60,45 @@ test("중복 검사 요청은 추가 네트워크 호출 없이 거절한다", a
   release();
   await assert.rejects(first, /offline/);
 });
+
+test("진행 상황은 실제 검사 청크만 집계한다", async () => {
+  const { checker } = service();
+  const progress = [];
+  await checker.checkText("첫째\n\n둘째", (value) => progress.push(value));
+  assert.deepEqual(progress, [{ completed: 0, total: 2 }, { completed: 1, total: 2 }, { completed: 2, total: 2 }]);
+});
+
+test("취소는 진행 중 요청을 중단하고 후속 검사를 허용한다", async () => {
+  let entered;
+  const started = new Promise((resolve) => { entered = resolve; });
+  let blocking = true;
+  const checker = createSpellChecker({ fetchImpl: async (url, { signal }) => {
+    if (!url.includes("SpellerProxy")) return { ok: true, text: async () => "passportKey=abc" };
+    if (!blocking) return { ok: true, json: async () => ({ message: { result: { html: "다음" } } }) };
+    entered();
+    return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true }));
+  } });
+  const pending = checker.checkText("첫 문장\n둘째 문장");
+  await started;
+  checker.cancel();
+  await assert.rejects(pending, { name: "AbortError" });
+  blocking = false;
+  assert.equal((await checker.checkText("다음")).html, "다음");
+});
+
+test("청크 사이 대기 중 취소하면 추가 요청을 보내지 않는다", async () => {
+  let entered;
+  let requests = 0;
+  const started = new Promise((resolve) => { entered = resolve; });
+  const checker = createSpellChecker({
+    fetchImpl: async (url) => !url.includes("SpellerProxy")
+      ? { ok: true, text: async () => "passportKey=abc" }
+      : { ok: true, json: async () => { requests++; return { message: { result: { html: "문장" } } }; } },
+    pause: (_ms, signal) => { entered(); return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true })); }
+  });
+  const pending = checker.checkText("첫째\n둘째");
+  await started;
+  checker.cancel();
+  await assert.rejects(pending, { name: "AbortError" });
+  assert.equal(requests, 1);
+});

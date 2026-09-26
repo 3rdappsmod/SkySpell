@@ -9,6 +9,14 @@ contextBridge.exposeInMainWorld("skyspell", {
   getSettings: () => ipcRenderer.invoke("store:get-settings"),
   setSettings: (settings) => ipcRenderer.invoke("store:set-settings", settings),
 
+  confirmDiscard: () => ipcRenderer.invoke("document:confirm-discard"),
+  cancelSpelling: () => ipcRenderer.invoke("spellcheck:cancel"),
+  onSpellProgress: (callback) => {
+    const handler = (_event, progress) => callback(progress);
+    ipcRenderer.on("spellcheck:progress", handler);
+    return () => ipcRenderer.removeListener("spellcheck:progress", handler);
+  },
+
   checkSpelling: (text) => ipcRenderer.invoke("spellcheck:check", text),
 
   writeClipboard: (text) => ipcRenderer.invoke("clipboard:write-text", text),

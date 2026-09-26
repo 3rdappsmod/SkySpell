@@ -46,6 +46,9 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-prevent-unload", (event) => {
+    if (confirmDiscard()) event.preventDefault();
+  });
   mainWindow.webContents.on("will-navigate", (event) => event.preventDefault());
 
   if (bounds.maximized) mainWindow.maximize();
@@ -87,6 +90,16 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
+function confirmDiscard() {
+  return dialog.showMessageBoxSync(mainWindow, {
+    type: "warning", title: "저장하지 않은 변경 사항",
+    message: "저장하지 않은 글이 있습니다. 변경 사항을 버리시겠습니까?",
+    buttons: ["계속 작성", "변경 사항 버리기"], defaultId: 0, cancelId: 0,
+    noLink: true
+  }) === 1;
+}
+ipcMain.handle("document:confirm-discard", () => confirmDiscard());
+
 // ---- IPC: 파일 다이얼로그 ----
 
 ipcMain.handle("dialog:open-text-file", async () => {
@@ -125,11 +138,16 @@ ipcMain.handle("store:set-settings", (_event, settings) => {
 
 // ---- IPC: 맞춤법 검사 ----
 
-ipcMain.handle("spellcheck:check", async (_event, text) => {
+ipcMain.handle("spellcheck:cancel", () => spellChecker.cancel());
+
+ipcMain.handle("spellcheck:check", async (event, text) => {
   try {
-    const result = await spellChecker.checkText(text);
+    const result = await spellChecker.checkText(text, (progress) => {
+      if (!event.sender.isDestroyed()) event.sender.send("spellcheck:progress", progress);
+    });
     return { ok: true, ...result };
   } catch (err) {
+    if (err.name === "AbortError") return { ok: false, canceled: true };
     return { ok: false, error: err.message || String(err) };
   }
 });

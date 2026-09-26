@@ -14,6 +14,9 @@ const guard = setTimeout(() => { console.error("GUI test timed out"); app.exit(1
 app.whenReady().then(async () => {
   const win = BrowserWindow.getAllWindows()[0];
   const errors = [];
+  let discardResponse = 1;
+  let discardPrompts = 0;
+  dialog.showMessageBoxSync = () => { discardPrompts++; return discardResponse; };
   win.webContents.on("console-message", (_event, details) => {
     if (details.level === "error") errors.push(details.message);
   });
@@ -112,6 +115,71 @@ app.whenReady().then(async () => {
   await waitFor("document.getElementById('statusLine').textContent.includes('테스트 네트워크 실패')");
   assert.equal(await evaluate("document.getElementById('btnCheck').disabled"), false);
   assert.equal(await evaluate("document.getElementById('btnApply').disabled"), true);
+  // 미저장 글을 지우거나 다른 파일로 교체할 때 취소하면 원문을 유지한다.
+  discardResponse = 0;
+  await input("보호해야 할 원문");
+  const promptsBefore = discardPrompts;
+  await evaluate("document.getElementById('btnClear').click()");
+  await waitFor("!document.getElementById('inputText').disabled");
+  assert.equal(await evaluate("document.getElementById('inputText').value"), "보호해야 할 원문");
+  await evaluate("document.getElementById('btnOpen').click()");
+  await waitFor("!document.getElementById('inputText').disabled");
+  assert.equal(await evaluate("document.getElementById('inputText').value"), "보호해야 할 원문");
+  assert.equal(discardPrompts, promptsBefore + 2);
+
+  // 저장 취소·실패 후에도 종료 확인이 유지된다.
+  dialog.showSaveDialog = async () => ({ canceled: true });
+  await evaluate("document.getElementById('btnSave').click()");
+  await sleep(100);
+  win.close();
+  await sleep(100);
+  assert.equal(win.isDestroyed(), false);
+  assert.equal(discardPrompts, promptsBefore + 3);
+  dialog.showSaveDialog = async () => ({ canceled: false, filePath: profile });
+  await evaluate("document.getElementById('btnSave').click()");
+  await waitFor("document.getElementById('statusLine').classList.contains('error')");
+  win.close();
+  await sleep(100);
+  assert.equal(win.isDestroyed(), false);
+  assert.equal(discardPrompts, promptsBefore + 4);
+
+  // 저장 대화상자가 열린 동안 원문이 바뀌면 새 원문은 미저장 상태다.
+  let finishSave;
+  dialog.showSaveDialog = () => new Promise((resolve) => { finishSave = resolve; });
+  await evaluate("document.getElementById('btnSave').click()");
+  await sleep(100);
+  await input("저장 요청 후 바뀐 원문");
+  finishSave({ canceled: false, filePath: saveFile });
+  await sleep(100);
+  assert.equal(fs.readFileSync(saveFile, "utf8"), "보호해야 할 원문");
+  win.close();
+  await sleep(100);
+  assert.equal(win.isDestroyed(), false);
+  assert.equal(discardPrompts, promptsBefore + 5);
+
+  discardResponse = 1;
+  await evaluate("document.getElementById('btnClear').click()");
+  await waitFor("document.getElementById('inputText').value === ''");
+
+  // 실제 IPC 경로로 검사 취소와 진행 표시를 확인한다.
+  ipcMain.removeHandler("spellcheck:check");
+  ipcMain.removeHandler("spellcheck:cancel");
+  let finishCheck;
+  ipcMain.handle("spellcheck:check", (event) => {
+    event.sender.send("spellcheck:progress", { completed: 1, total: 4 });
+    return new Promise((resolve) => { finishCheck = resolve; });
+  });
+  ipcMain.handle("spellcheck:cancel", () => finishCheck({ ok: false, canceled: true }));
+  await input("취소할 검사");
+  await evaluate("document.getElementById('btnCheck').click()");
+  await waitFor("document.getElementById('statusLine').textContent.includes('1/4')");
+  await evaluate("document.getElementById('btnCancel').click()");
+  await waitFor("!document.getElementById('btnCheck').disabled");
+  assert.equal(await evaluate("document.getElementById('btnApply').disabled"), true);
+  await evaluate("document.getElementById('btnCheck').click()");
+  await waitFor("document.getElementById('statusLine').textContent.includes('1/4')");
+  await input("원문 수정으로 취소");
+  await waitFor("!document.getElementById('btnCheck').disabled");
   assert.deepEqual(errors, []);
   console.log("GUI_SMOKE_PASS", profile);
   clearTimeout(guard);

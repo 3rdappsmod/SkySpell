@@ -12,6 +12,7 @@
     limitInput: document.getElementById("limitInput"),
     statusLine: document.getElementById("statusLine"),
     btnCheck: document.getElementById("btnCheck"),
+    btnCancel: document.getElementById("btnCancel"),
     btnApply: document.getElementById("btnApply"),
     btnCopyResult: document.getElementById("btnCopyResult"),
     btnClear: document.getElementById("btnClear"),
@@ -29,7 +30,10 @@
     charCounter: { unit: "char", includeSpaces: true, limit: 1000 },
     correctedText: "",
     revision: 0,
-    checking: false
+    checking: false,
+    checkRevision: -1,
+    savedText: "",
+    documentBusy: false
   };
 
   let toastTimer = null;
@@ -90,7 +94,29 @@
     persistCharCounterSettings();
   });
 
+  function isDirty() { return els.inputText.value !== state.savedText; }
+
+  window.addEventListener("beforeunload", (event) => {
+    if (isDirty()) { event.preventDefault(); event.returnValue = false; }
+  });
+
+  async function replaceDocument(load) {
+    if (state.documentBusy) return;
+    state.documentBusy = true;
+    els.inputText.disabled = true;
+    try {
+      if (isDirty() && !await window.skyspell.confirmDiscard()) return;
+      const text = await load();
+      if (text === null) return;
+      els.inputText.value = text;
+      state.savedText = text;
+      invalidateResult();
+    } catch (error) { setStatus(error.message, "error"); }
+    finally { state.documentBusy = false; els.inputText.disabled = false; }
+  }
+
   function invalidateResult() {
+    if (state.checking) window.skyspell.cancelSpelling().catch((error) => setStatus(error.message, "error"));
     state.revision++;
     state.correctedText = "";
     els.btnApply.disabled = true;
@@ -138,7 +164,7 @@
   }
 
   async function runSpellCheck() {
-    if (state.checking) return;
+    if (state.checking || state.documentBusy) return;
     const text = els.inputText.value;
     if (!text.trim()) {
       setStatus(window.SkySpellI18n.t("emptyInputWarning"), "error");
@@ -147,7 +173,9 @@
 
     invalidateResult();
     const revision = state.revision;
+    state.checkRevision = revision;
     state.checking = true;
+    els.btnCancel.disabled = false;
     els.btnCheck.disabled = true;
     els.btnApply.disabled = true;
     setStatus(window.SkySpellI18n.t("checking"));
@@ -159,9 +187,12 @@
       result = { ok: false, error: error.message || String(error) };
     } finally {
       state.checking = false;
+      els.btnCancel.disabled = true;
       els.btnCheck.disabled = false;
     }
     if (revision !== state.revision) return;
+
+    if (result.canceled) { setStatus("검사를 취소했습니다."); return; }
 
     if (!result.ok) {
       setStatus(window.SkySpellI18n.t("checkFailed", { msg: result.error }), "error");
@@ -186,6 +217,17 @@
     }
   }
 
+  window.skyspell.onSpellProgress(({ completed, total }) => {
+    if (state.checking && state.checkRevision === state.revision) {
+      setStatus(`맞춤법 검사 중… ${completed}/${total}`);
+    }
+  });
+  els.btnCancel.addEventListener("click", () => {
+    state.revision++;
+    window.skyspell.cancelSpelling().catch((error) => setStatus(error.message, "error"));
+    setStatus("검사를 취소했습니다.");
+  });
+
   els.btnCheck.addEventListener("click", runSpellCheck);
 
   els.btnApply.addEventListener("click", () => {
@@ -205,29 +247,27 @@
     showToast(window.SkySpellI18n.t("copiedToClipboard"));
   });
 
-  els.btnClear.addEventListener("click", () => {
-    els.inputText.value = "";
-    invalidateResult();
-  });
+  els.btnClear.addEventListener("click", () => replaceDocument(async () => ""));
 
   // ---------- 파일 ----------
-
-  els.btnOpen.addEventListener("click", async () => {
-    try {
-      const result = await window.skyspell.openTextFile();
-      if (result.canceled) return;
-      els.inputText.value = result.content;
-      invalidateResult();
-      showToast(window.SkySpellI18n.t("fileOpened"));
-    } catch (error) { setStatus(error.message, "error"); }
-  });
+  els.btnOpen.addEventListener("click", () => replaceDocument(async () => {
+    const result = await window.skyspell.openTextFile();
+    if (result.canceled) return null;
+    showToast(window.SkySpellI18n.t("fileOpened"));
+    return result.content;
+  }));
 
   els.btnSave.addEventListener("click", async () => {
+    if (state.documentBusy) return;
+    state.documentBusy = true;
+    const snapshot = els.inputText.value;
     try {
-      const result = await window.skyspell.saveTextFile("skyspell.txt", els.inputText.value);
+      const result = await window.skyspell.saveTextFile("skyspell.txt", snapshot);
       if (result.canceled) return;
+      state.savedText = snapshot;
       showToast(window.SkySpellI18n.t("fileSaved"));
     } catch (error) { setStatus(error.message, "error"); }
+    finally { state.documentBusy = false; }
   });
 
   // ---------- 다크 모드 ----------

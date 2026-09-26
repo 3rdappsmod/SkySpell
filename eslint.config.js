@@ -8,7 +8,7 @@ module.exports = [
       ecmaVersion: 2022,
       sourceType: "commonjs",
       globals: Object.fromEntries([
-        "window", "document", "globalThis", "fetch", "AbortSignal", "URL", "URLSearchParams",
+        "window", "document", "globalThis", "fetch", "AbortSignal", "AbortController", "URL", "URLSearchParams",
         "setTimeout", "clearTimeout", "console", "process", "Buffer", "__dirname"
       ].map((name) => [name, "readonly"]))
     },

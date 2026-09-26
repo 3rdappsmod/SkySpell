@@ -4,6 +4,7 @@
 const SPELLER_URL = "https://m.search.naver.com/p/csearch/ocontent/util/SpellerProxy";
 const PASSPORT_KEY_URL = "https://search.naver.com/search.naver?query=" + encodeURIComponent("맞춤법검사기");
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36";
+const { setTimeout: delay } = require("node:timers/promises");
 const MAX_CHUNK_LENGTH = 490;
 
 function splitIntoChunks(text) {
@@ -23,20 +24,22 @@ function splitIntoChunks(text) {
   return chunks;
 }
 
-function createSpellChecker({ fetchImpl = globalThis.fetch, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+function createSpellChecker({ fetchImpl = globalThis.fetch, pause = (ms, signal) => delay(ms, undefined, { signal }) } = {}) {
   let passportKey = "";
   let pendingKey = null;
   let busy = false;
+  let controller = null;
 
-  async function request(url) {
+  async function request(url, format) {
     try {
       const response = await fetchImpl(url, {
         headers: { "user-agent": USER_AGENT, referer: "https://search.naver.com/" },
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])
       });
       if (!response.ok) throw new Error(`네이버 응답 오류 (HTTP ${response.status})`);
-      return response;
+      return await response[format]();
     } catch (error) {
+      controller.signal.throwIfAborted();
       if (error.name === "TimeoutError" || error.name === "AbortError") {
         throw new Error("네이버 응답 시간이 초과되었습니다. 잠시 후 다시 시도하세요.", { cause: error });
       }
@@ -48,7 +51,7 @@ function createSpellChecker({ fetchImpl = globalThis.fetch, pause = (ms) => new 
     if (passportKey) return passportKey;
     if (!pendingKey) {
       pendingKey = (async () => {
-        const html = await (await request(PASSPORT_KEY_URL)).text();
+        const html = await request(PASSPORT_KEY_URL, "text");
         const match = /passportKey=([a-zA-Z0-9]+)/.exec(html);
         if (!match) throw new Error("네이버 인증 정보를 찾지 못했습니다. 서비스 변경 또는 접속 제한일 수 있습니다.");
         passportKey = match[1];
@@ -61,7 +64,7 @@ function createSpellChecker({ fetchImpl = globalThis.fetch, pause = (ms) => new 
   async function checkChunk(chunk) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const params = new URLSearchParams({ color_blindness: "0", q: chunk, passportKey: await getKey() });
-      const data = await (await request(`${SPELLER_URL}?${params}`)).json();
+      const data = await request(`${SPELLER_URL}?${params}`, "json");
       const message = data && data.message;
       if (message && message.error) {
         passportKey = "";
@@ -76,34 +79,39 @@ function createSpellChecker({ fetchImpl = globalThis.fetch, pause = (ms) => new 
     }
   }
 
-  async function checkText(text) {
+  async function checkText(text, onProgress = () => {}) {
     if (typeof text !== "string") throw new Error("검사할 문장을 입력하세요.");
     if (!text.trim()) return { html: "", errors: 0 };
     if (busy) throw new Error("이미 맞춤법 검사가 진행 중입니다.");
     busy = true;
+    controller = new AbortController();
     try {
       const result = { html: "", errors: 0 };
       // 줄바꿈과 청크 가장자리 공백은 API의 정규화에 맡기지 않고 보존한다.
-      const parts = text.split(/(\r\n|\r|\n)/);
+      const chunks = text.split(/(\r\n|\r|\n)/).flatMap(splitIntoChunks);
+      const total = chunks.filter((chunk) => chunk.trim()).length;
+      onProgress({ completed: 0, total });
       let requests = 0;
-      for (const part of parts) {
-        for (const chunk of splitIntoChunks(part)) {
-          const core = chunk.trim();
-          if (!core) { result.html += chunk; continue; }
-          const leading = chunk.slice(0, chunk.length - chunk.trimStart().length);
-          const trailing = chunk.slice(chunk.trimEnd().length);
-          if (requests++) await pause(200);
-          const checked = await checkChunk(core);
-          result.html += leading + checked.html + trailing;
-          result.errors += checked.errors;
-        }
+      for (const chunk of chunks) {
+        controller.signal.throwIfAborted();
+        const core = chunk.trim();
+        if (!core) { result.html += chunk; continue; }
+        const leading = chunk.slice(0, chunk.length - chunk.trimStart().length);
+        const trailing = chunk.slice(chunk.trimEnd().length);
+        if (requests) await pause(200, controller.signal);
+        controller.signal.throwIfAborted();
+        const checked = await checkChunk(core);
+        result.html += leading + checked.html + trailing;
+        result.errors += checked.errors;
+        onProgress({ completed: ++requests, total });
       }
       return result;
     } finally {
       busy = false;
+      controller = null;
     }
   }
-  return { checkText };
+  return { checkText, cancel: () => controller?.abort() };
 }
 
 module.exports = { ...createSpellChecker(), createSpellChecker, splitIntoChunks };
