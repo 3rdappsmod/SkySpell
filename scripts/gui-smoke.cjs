@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const assert = require("node:assert/strict");
+const { createScreenshotWriter } = require("./gui-artifacts.cjs");
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "skyspell-gui-"));
 app.setPath("userData", profile);
 require("../src/main/main");
@@ -13,6 +14,11 @@ const guard = setTimeout(() => { console.error("GUI test timed out"); app.exit(1
 
 app.whenReady().then(async () => {
   const win = BrowserWindow.getAllWindows()[0];
+  const saveScreenshot = createScreenshotWriter({
+    enabled: process.argv.includes("--screenshots"),
+    directory: profile,
+    capture: () => win.webContents.capturePage()
+  });
   const errors = [];
   let discardResponse = 1;
   let discardPrompts = 0;
@@ -54,7 +60,7 @@ app.whenReady().then(async () => {
     assert.equal(result.copyDisabled, false, result.status);
     assert.ok(result.text.includes("\n\n"));
     assert.ok(result.text.includes("안녕하세요"));
-    fs.writeFileSync(path.join(profile, "live.png"), (await win.webContents.capturePage()).toPNG());
+    await saveScreenshot("live.png");
   }
 
   ipcMain.removeHandler("spellcheck:check");
@@ -98,17 +104,17 @@ app.whenReady().then(async () => {
   await evaluate("document.getElementById('btnDarkMode').click()");
   assert.equal(await evaluate("document.body.classList.contains('theme-dark')"), true);
   await sleep(250);
-  fs.writeFileSync(path.join(profile, "dark.png"), (await win.webContents.capturePage()).toPNG());
+  await saveScreenshot("dark.png");
   win.webContents.reload();
   await waitFor("document.body.classList.contains('theme-dark')");
   await evaluate("document.getElementById('btnDarkMode').click()");
   await input("안녕하새요");
   await evaluate("document.getElementById('btnCheck').click()");
   await waitFor("!document.getElementById('btnApply').disabled");
-  fs.writeFileSync(path.join(profile, "light.png"), (await win.webContents.capturePage()).toPNG());
+  await saveScreenshot("light.png");
   win.setSize(860, 560);
   await sleep(200);
-  fs.writeFileSync(path.join(profile, "compact.png"), (await win.webContents.capturePage()).toPNG());
+  await saveScreenshot("compact.png");
   ipcMain.removeHandler("spellcheck:check");
   ipcMain.handle("spellcheck:check", () => { throw new Error("테스트 네트워크 실패"); });
   await evaluate("document.getElementById('btnCheck').click()");

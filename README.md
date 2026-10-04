@@ -45,7 +45,10 @@ npm run lint       # ESLint
 npm test           # 글자수 · 파서 · API 오류/재시도/분할 테스트
 npm run test:gui   # 실제 Electron 창을 띄우는 GUI 회귀 검사(임시 프로필)
 npm run test:gui -- --live # 네이버 실서비스 교정도 확인
+npm run test:gui -- --screenshots # 화면 캡처도 임시 프로필에 저장
 ```
+
+GUI 기능 검사는 기본적으로 스크린샷을 생성하지 않습니다. CI의 Xvfb 환경에서는 앱이 정상 동작해도 Chromium의 화면 캡처가 `UnknownVizError`로 실패할 수 있기 때문입니다. 화면을 확인하려면 `--screenshots`를 지정하세요(`--live`와 함께 사용 가능). 이 옵션을 지정한 경우 캡처 실패도 오류로 보고합니다.
 
 ## 빌드
 
