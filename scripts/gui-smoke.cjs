@@ -83,6 +83,19 @@ app.whenReady().then(async () => {
   await waitFor("!document.getElementById('btnApply').disabled");
   await evaluate("document.querySelector('[data-value=char]').click()");
   assert.equal(await evaluate("document.getElementById('resultCountLabel').textContent"), "5/1000(글자 수, 공백포함)");
+  // 파일 열기가 대기 중일 때 교정 적용으로 원문을 바꾸면 안 된다.
+  let finishOpen;
+  const openStarted = new Promise((resolve) => {
+    dialog.showOpenDialog = () => new Promise((finish) => { finishOpen = finish; resolve(); });
+  });
+  await evaluate("document.getElementById('btnOpen').click()");
+  await openStarted;
+  await evaluate("document.getElementById('btnApply').click()");
+  assert.equal(await evaluate("document.getElementById('inputText').value"), "안녕하새요");
+  finishOpen({ canceled: true });
+  await waitFor("!document.getElementById('inputText').disabled");
+  assert.equal(await evaluate("document.getElementById('btnApply').disabled"), false);
+
   await evaluate("document.getElementById('btnCopyResult').click()");
   await sleep(100);
   assert.equal(await clipboard.readText(), "안녕하세요");
@@ -100,6 +113,20 @@ app.whenReady().then(async () => {
   await evaluate("document.getElementById('btnSave').click()");
   await sleep(100);
   assert.equal(fs.readFileSync(saveFile, "utf8"), fs.readFileSync(textFile, "utf8"));
+
+  // textarea가 정규화한 Windows/구형 Mac 줄바꿈도 열기 직후에는 미저장이 아니다.
+  for (const newline of ["\r\n", "\r", "\n"]) {
+    fs.writeFileSync(textFile, `첫째 줄${newline}둘째 줄${newline}`);
+    await evaluate("document.getElementById('btnOpen').click()");
+    await waitFor("document.getElementById('inputText').value === '첫째 줄\\n둘째 줄\\n'");
+    const prompts = discardPrompts;
+    discardResponse = 0;
+    await evaluate("document.getElementById('btnClear').click()");
+    await waitFor("!document.getElementById('inputText').disabled");
+    assert.equal(discardPrompts, prompts, "Unedited file must not require discard confirmation");
+    assert.equal(await evaluate("document.getElementById('inputText').value"), "");
+    discardResponse = 1;
+  }
 
   await evaluate("document.getElementById('btnDarkMode').click()");
   assert.equal(await evaluate("document.body.classList.contains('theme-dark')"), true);

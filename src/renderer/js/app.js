@@ -109,7 +109,8 @@
       const text = await load();
       if (text === null) return;
       els.inputText.value = text;
-      state.savedText = text;
+      // textarea는 CRLF/CR을 LF로 바꾸므로 화면의 값을 저장 기준으로 삼는다.
+      state.savedText = els.inputText.value;
       invalidateResult();
     } catch (error) { setStatus(error.message, "error"); }
     finally { state.documentBusy = false; els.inputText.disabled = false; }
@@ -231,7 +232,7 @@
   els.btnCheck.addEventListener("click", runSpellCheck);
 
   els.btnApply.addEventListener("click", () => {
-    if (!state.correctedText) return;
+    if (state.documentBusy || !state.correctedText) return;
     els.inputText.value = state.correctedText;
     invalidateResult();
     showToast(window.SkySpellI18n.t("appliedCorrection"));
