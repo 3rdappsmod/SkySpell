@@ -54,3 +54,47 @@ UI 구성, Electron 메인/렌더러 분리, 코드포인트 기반 글자수 �
 앱 실행·검사·빌드 명령 앞에 Node.js 버전 검사를 추가했습니다. 이후 저장소에서 업데이트된 electron-store 11의 ESM default export에 맞춰 로딩 코드를 수정했고, 깨끗한 `npm ci` 이후 lint·테스트 21개·실제 GUI 검사를 통과했습니다.
 
 일반 사용자 Node.js 24 환경에서 Linux AppImage/deb 빌드를 다시 완료했습니다. Windows 교차 빌드는 ESM 오류를 해결한 뒤 NSIS 단계까지 진행했으며 Wine이 필요합니다. Windows 실기기 설치/실행 검증은 별도입니다.
+
+## 전체 커밋 재검토 (2026-10-04)
+
+대상: 초기 커밋 `48a8316`부터 main의 `fe56264`까지 15개 커밋(병합 포함).
+메인/렌더러/IPC, 맞춤법 요청·취소·파서, 글자수 계산, 파일·설정 저장,
+자동 업데이트, GUI 검사, npm 잠금 파일, CI·Release·Dependabot 구성을 검토했습니다.
+
+### 판정 및 수정
+
+프로세스 분리, sandbox/contextIsolation, 외부 탐색 차단, 응답을 텍스트 노드로
+렌더링하는 방식은 현재 앱에 적절합니다. 문서 revision에 따른 오래된 결과
+무효화, AbortController 취소, 순차 요청과 타임아웃도 유지합니다.
+이전 GUI CI 오류 수정은 기능 검증을 유지하면서 진단용 캡처만 선택적으로
+실행하므로 되돌릴 이유가 없었습니다.
+
+이번에 확인한 수정 대상은 다음과 같습니다.
+
+- **문서 미저장 상태 오판:** Windows CRLF 또는 CR 줄바꿈 파일을 열면 textarea는
+  LF로 정규화하지만 저장 기준은 원본 문자열이어서, 편집하지 않아도 버리기
+  확인이 표시됐습니다. 화면에 실제로 들어간 값을 저장 기준으로 사용합니다.
+- **문서 작업 중 교정 적용:** 파일 열기 대기 중 교정 적용 버튼이 원문을 바꿀
+  수 있었습니다. 문서 작업이 끝날 때까지 교정 적용을 막습니다. 열기를 취소하면
+  기존 교정 결과는 유지되고 다시 적용할 수 있습니다.
+- **개발 의존성 보안 공지:** `http-cache-semantics` 4.2.0에 대한
+  [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp)가
+  `npm audit`에서 high 1건으로 보고됐습니다. 의존 경로는
+  `electron-builder → app-builder-lib → @electron/get → got → cacheable-request`이며
+  개발/다운로드 도구의 의존성입니다. 기존 semver 범위 내 4.3.0으로 잠금 파일만
+  갱신했고, 재설치 후 감사 결과는 0건입니다. 앱의 네이버 요청은 이 캐시를
+  사용하지 않으며, 실제 앱에서 사용자 정보 유출을 재현한 것은 아닙니다.
+
+### 검증 및 한계
+
+- 두 문서 오류는 기존 코드에서 GUI 회귀 검사의 실패로 각각 재현했습니다.
+- 수정 후 ESLint 및 단위 테스트 27개 통과.
+- Xvfb에서 실제 Electron GUI 검사 통과: CRLF/CR/LF 파일의 미저장 판정,
+  열기 대기 중 교정 적용 차단, 열기 취소 후 교정 결과 유지 등 회귀 검사 포함.
+- 네이버 실서비스 테스트 문장의 교정과 빈 줄 보존 확인.
+- 새 잠금 파일로 `npm ci` 및 `npm audit` 취약점 0건 확인.
+- `npx electron-builder --linux --win --publish never`로 Linux x64 AppImage/deb와
+  Windows x64 NSIS 설치 파일 생성 성공. Windows 빌드는 Linux의 Wine을 사용했습니다.
+- Windows 실기기 설치·실행 및 공개 Release 간 자동 업데이트는 이번 검토에서도
+  검증하지 않았습니다. 비공식 네이버 API의 향후 변경 대응, GitHub 브랜치 보호와
+  자동 병합 변수 설정은 기존 배포 운영 조건으로 남습니다.
