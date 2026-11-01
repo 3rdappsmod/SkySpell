@@ -30,12 +30,12 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "electron": "^44.5.1",
-    "electron-builder": "^26.17.0",
+    "electron-builder": "^26.18.0",
     "eslint": "^10.13.0"
   },
   "dependencies": {
     "electron-store": "^11.0.2",
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.8.11"
   },
   "build": {
     "appId": "com.skyspell.app",
